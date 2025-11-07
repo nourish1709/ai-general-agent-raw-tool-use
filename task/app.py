@@ -15,6 +15,7 @@ from task.tools.web_search import WebSearchTool
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+
 def main():
     #TODO:
     # 1. Create UserClient
@@ -25,11 +26,25 @@ def main():
     #    - Add User message to Conversation
     #    - Call OpenAIClient with conversation history
     #    - Add Assistant message to Conversation and print its content
-    raise NotImplementedError()
+    user_client = UserClient()
+    tools = [WebSearchTool(OPENAI_API_KEY), GetUserByIdTool(user_client), SearchUsersTool(user_client),
+             CreateUserTool(user_client), UpdateUserTool(user_client), DeleteUserTool(user_client)]
+    openai_client = OpenAIClient(model='gpt-5-nano', api_key=OPENAI_API_KEY,tools=tools)
+    conversation = Conversation()
+    conversation.add_message(Message(role=Role.SYSTEM, content=SYSTEM_PROMPT))
+    while True:
+        user_input = input("> ").strip()
+        conversation.add_message(Message(role=Role.USER, content=user_input))
+        response = openai_client.get_completion(messages=conversation.get_messages())
+        if response.content:
+            conversation.add_message(Message(role=Role.AI, content=response.content))
+            print(response.content)
+        else:
+            print('No response from AI')
 
 
 main()
 
-#TODO:
+# TODO:
 # Implement it with Anthropic orchestration model
 # https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview#single-tool-example

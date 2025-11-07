@@ -19,7 +19,14 @@ class OpenAIClient:
         # 5. Prepare tools dict where key will be tool name and value will
         # 6. Prepare tools schemas list
         # 7. Optional: print endpoint and tools schemas
-        raise NotImplementedError()
+        if not api_key:
+            raise ValueError('API key is required')
+
+        self._api_key = 'Bearer ' + api_key
+        self._endpoint = 'https://api.openai.com/v1/chat/completions'
+        self._model = model
+        self._tools: dict[str, BaseTool] = {tool.name: tool for tool in tools}
+        self._tool_schemas = [tool.openai_schema for tool in tools]
 
     def get_completion(self, messages: list[Message], print_request: bool = True) -> Message:
         #TODO:
@@ -52,11 +59,41 @@ class OpenAIClient:
         #           - make recursive call (return `get_completion` with `messages` and `print_request`)
         #       No: return `ai_response` (final assistant response)
         # Otherwise raise exception
-        raise NotImplementedError()
+        headers = {
+            'Authorization': self._api_key,
+            'Content-Type': 'application/json'
+        }
+        request_data = {
+            'model': self._model,
+            'messages': [msg.to_dict() for msg in messages],
+            'tools': self._tool_schemas
+        }
+        if print_request:
+            print(json.dumps(request_data, indent=4))
+
+        response = requests.post(url=self._endpoint, headers=headers, json=request_data)
+        if response.status_code == 200:
+            response_body = response.json()
+            choices = response_body.get('choices', [])
+            choice = choices[0]
+            print(json.dumps(choice, indent=4))
+            message_data = choice.get('message', {})
+            content = message_data.get('content', '')
+            tool_calls = message_data.get('tool_calls', [])
+            ai_response = Message(role=Role.AI, content=content, tool_calls=tool_calls)
+            if choice.get('finish_reason', '') == 'tool_calls':
+                messages.append(ai_response)
+                tool_messages = self._process_tool_calls(tool_calls)
+                messages.extend(tool_messages)
+                return self.get_completion(messages, print_request)
+            else:
+                return ai_response
+        else:
+            raise ValueError('Non-200 response from LLM: ' + response.text)
 
     def _process_tool_calls(self, tool_calls: list[dict[str, Any]]) -> list[Message]:
         """Process tool calls and add results to messages."""
-        tool_messages = []
+        tool_messages: list[Message] = []
         for tool_call in tool_calls:
             #TODO:
             # 1. Get `id` from `tool_call` and assign to `tool_call_id` variable
@@ -76,10 +113,22 @@ class OpenAIClient:
             #      between Assistant message `tool_calls[i][id]` and message in history.
             #      In case if no Tool message presented in history (no message at all or with different tool_call_id),
             #      then LLM with answer with Error (that not find tool message with specified id).
-            raise NotImplementedError()
+            tool_call_id = tool_call.get('id', '')
+            function = tool_call.get('function', {})
+            function_name = function.get('name', '')
+            arguments = json.loads(function.get('arguments', '{}'))
+            tool_execution_result = self._call_tool(function_name, arguments)
+            tool_messages.append(
+                Message(role=Role.TOOL, name=function_name, tool_call_id=tool_call_id, content=tool_execution_result))
+            print(f"FUNCTION '{function_name}'\n{tool_execution_result}\n{'-'*50}")
+
         return tool_messages
 
     def _call_tool(self, function_name: str, arguments: dict[str, Any]) -> str:
         #TODO:
         # Get tool from `__tools_dict`, id present then return executed result, otherwise return `f"Unknown function: {function_name}"`
-        raise NotImplementedError()
+        tool = self._tools.get(function_name)
+        if not tool:
+            return f"Unknown function: {function_name}"
+
+        return tool.execute(arguments)
