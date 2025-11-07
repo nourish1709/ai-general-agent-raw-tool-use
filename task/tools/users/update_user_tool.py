@@ -23,7 +23,6 @@ class UpdateUserTool(BaseUserServiceTool):
         # - id: number, required, User ID that should be updated.
         # - new_info: UserUpdate.model_json_schema()
         json_schema = UserUpdate.model_json_schema()
-        print(f'UserUpdate json_schema: {json_schema}')
 
         return {
             "type": "object",

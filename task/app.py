@@ -35,7 +35,7 @@ def main():
     while True:
         user_input = input("> ").strip()
         conversation.add_message(Message(role=Role.USER, content=user_input))
-        response = openai_client.get_completion(messages=conversation.get_messages())
+        response = openai_client.get_completion(messages=conversation.get_messages(), print_request=False)
         if response.content:
             conversation.add_message(Message(role=Role.AI, content=response.content))
             print(response.content)

@@ -20,7 +20,7 @@ class CreateUserTool(BaseUserServiceTool):
     def input_schema(self) -> dict[str, Any]:
         # TODO: Provide tool params Schema. To do that you can create json schema from UserCreate pydentic model ` UserCreate.model_json_schema()`
         json_schema = UserCreate.model_json_schema()
-        print(f'UserCreate json_schema: {json_schema}')
+
         return {
             "type": "object",
             **json_schema
